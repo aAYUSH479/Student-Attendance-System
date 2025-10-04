@@ -71,8 +71,9 @@
     </style>
 </head>
 <body>
-   <h2>Welcome, {{ student.name }}</h2>
-   <p>Roll No: {{ student.roll_no }}</p>
+  <h2>Welcome, {{ student["name"] }}</h2>
+<p>Roll No: {{ student["roll_no"] }}</p>
+
 
     {% if qr_file %}
     <h3>Your QR Code:</h3>
