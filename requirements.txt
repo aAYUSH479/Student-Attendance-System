@@ -1,5 +1,5 @@
-Flask
-gunicorn
+flask
 qrcode
-openpyxl
+pillow
 pandas
+openpyxl
