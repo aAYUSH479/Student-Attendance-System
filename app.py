@@ -138,13 +138,24 @@ def student_dashboard():
 def student_qr():
     if "student" not in session:
         return redirect(url_for("login"))
+    
     student = session["student"]
     data = {"roll_no": student["roll_no"], "name": student["name"]}
+
+    # Ensure static/qr folder exists
+    qr_folder = os.path.join(app.root_path, 'static', 'qr')
+    os.makedirs(qr_folder, exist_ok=True)
+
+    # File path for student QR
+    qr_filename = f"{student['roll_no']}.png"
+    qr_path = os.path.join(qr_folder, qr_filename)
+
+    # Generate and save QR image
     img = qrcode.make(json.dumps(data))
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    buf.seek(0)
-    return send_file(buf, mimetype="image/png")
+    img.save(qr_path)
+
+    # Return HTML template (not send_file)
+    return render_template("student.html", student=student, qr_file=url_for('static', filename='qr/' + qr_filename))
 
 # Admin Dashboard
 @app.route("/admin_dashboard")
