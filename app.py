@@ -100,11 +100,26 @@ def login():
         conn.close()
 
         if student:
+            # Save student session
             session["student"] = {"id": student[0], "roll_no": student[1], "name": student[2]}
+
+            # Automatically generate QR when they log in
+            student_data = {"roll_no": student[1], "name": student[2]}
+
+            qr_folder = os.path.join(app.root_path, 'static', 'qr')
+            os.makedirs(qr_folder, exist_ok=True)
+
+            qr_filename = f"{student[1]}.png"
+            qr_path = os.path.join(qr_folder, qr_filename)
+
+            img = qrcode.make(json.dumps(student_data))
+            img.save(qr_path)
+
             return redirect(url_for("student_dashboard"))
         else:
             return render_template("login.html", error="Invalid student credentials!")
     return render_template("login.html")
+
 
 # Admin Login
 @app.route("/admin_login", methods=["GET","POST"])
@@ -131,7 +146,12 @@ def admin_login():
 def student_dashboard():
     if "student" not in session:
         return redirect(url_for("login"))
-    return render_template("student.html", student=session["student"])
+    
+    student = session["student"]
+    qr_filename = f"{student['roll_no']}.png"
+    qr_path = os.path.join('qr', qr_filename)
+    return render_template("student.html", student=student, qr_file=url_for('static', filename=qr_path))
+
 
 # Generate Student QR
 @app.route("/student_qr")
