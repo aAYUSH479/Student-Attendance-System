@@ -29,7 +29,7 @@
     <h1>Welcome, {{ student.name }}</h1>
     <p><b>Roll No:</b> {{ student.roll_no }}</p>
     <h3>Your Attendance QR Code</h3>
-    <img src="{{ url_for('student_qr') }}" alt="Student QR">
+    <img src="{{ qr_file }}" alt="Student QR" class="qr-image">
     <br>
     <a href="/logout">Logout</a>
 </body>
