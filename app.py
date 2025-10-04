@@ -170,35 +170,38 @@ def admin_dashboard():
     return render_template("admin.html", records=records, admin=session["admin"])
 
 # Mark Attendance
-@app.route("/mark_attendance", methods=["POST"])
+@app.route('/mark_attendance', methods=['POST'])
 def mark_attendance():
-    if "admin" not in session:
-        return jsonify({"status":"error","message":"not authorized"}), 401
-
-    try:
-        if request.is_json:
-            payload = request.get_json()
-            qr_data = payload.get("qr_data")
-        else:
-            qr_data = request.form.get("qr_data") or request.values.get("qr_data")
-        student = json.loads(qr_data)
-        roll_no = student.get("roll_no")
-        name = student.get("name")
-    except Exception as e:
-        return jsonify({"status":"error","message":"invalid qr data"}), 400
+    roll_no = request.form['roll_no']
+    name = request.form['name']
+    date_today = datetime.now().strftime("%Y-%m-%d")
+    time_now = datetime.now().strftime("%H:%M:%S")
 
     conn = sqlite3.connect(DB)
     c = conn.cursor()
-    now = datetime.now()
-    date = now.strftime("%Y-%m-%d")
-    time = now.strftime("%H:%M:%S")
-    c.execute("INSERT INTO attendance (roll_no, name, date, time) VALUES (?,?,?,?)",
-              (roll_no, name, date, time))
-    conn.commit()
-    conn.close()
 
-    export_to_excel()
-    return jsonify({"status":"ok","message":"attendance marked", "roll_no": roll_no, "name": name})
+    # ✅ Check if already marked today
+    c.execute("SELECT * FROM attendance WHERE roll_no=? AND date=?", (roll_no, date_today))
+    existing = c.fetchone()
+
+    if existing:
+        message = f"Attendance already marked today for {name} ({roll_no})!"
+    else:
+        c.execute("INSERT INTO attendance (roll_no, name, date, time) VALUES (?, ?, ?, ?)",
+                  (roll_no, name, date_today, time_now))
+        conn.commit()
+        message = f"Attendance marked successfully for {name} ({roll_no})!"
+
+        # ✅ Also update Excel
+        df = pd.DataFrame([[roll_no, name, date_today, time_now]],
+                          columns=["Roll No", "Name", "Date", "Time"])
+        if os.path.exists(EXCEL_FILE):
+            existing_df = pd.read_excel(EXCEL_FILE)
+            df = pd.concat([existing_df, df], ignore_index=True)
+        df.to_excel(EXCEL_FILE, index=False)
+
+    conn.close()
+    return render_template("attendance_result.html", message=message)
 
 # Export Excel
 @app.route("/export")
