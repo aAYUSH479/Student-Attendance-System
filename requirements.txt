@@ -2,4 +2,4 @@ Flask
 gunicorn
 qrcode
 openpyxl
-sqlite3-bro
+
