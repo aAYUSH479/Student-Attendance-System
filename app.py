@@ -100,26 +100,11 @@ def login():
         conn.close()
 
         if student:
-            # Save student session
             session["student"] = {"id": student[0], "roll_no": student[1], "name": student[2]}
-
-            # Automatically generate QR when they log in
-            student_data = {"roll_no": student[1], "name": student[2]}
-
-            qr_folder = os.path.join(app.root_path, 'static', 'qr')
-            os.makedirs(qr_folder, exist_ok=True)
-
-            qr_filename = f"{student[1]}.png"
-            qr_path = os.path.join(qr_folder, qr_filename)
-
-            img = qrcode.make(json.dumps(student_data))
-            img.save(qr_path)
-
             return redirect(url_for("student_dashboard"))
         else:
             return render_template("login.html", error="Invalid student credentials!")
     return render_template("login.html")
-
 
 # Admin Login
 @app.route("/admin_login", methods=["GET","POST"])
@@ -148,9 +133,21 @@ def student_dashboard():
         return redirect(url_for("login"))
     
     student = session["student"]
+    data = {"roll_no": student["roll_no"], "name": student["name"]}
+
+    # Ensure static/qr folder exists
+    qr_folder = os.path.join(app.root_path, 'static', 'qr')
+    os.makedirs(qr_folder, exist_ok=True)
+
+    # File path for student QR
     qr_filename = f"{student['roll_no']}.png"
-    qr_path = os.path.join('qr', qr_filename)
-    return render_template("student.html", student=student, qr_file=url_for('static', filename=qr_path))
+    qr_path = os.path.join(qr_folder, qr_filename)
+
+    # Generate and save QR image
+    img = qrcode.make(json.dumps(data))
+    img.save(qr_path)
+
+    return render_template("student.html", student=student, qr_file=url_for('static', filename='qr/' + qr_filename))
 
 
 # Generate Student QR
@@ -212,13 +209,24 @@ def mark_attendance():
     now = datetime.now()
     date = now.strftime("%Y-%m-%d")
     time = now.strftime("%H:%M:%S")
+
+    # ✅ Check if attendance already exists for this student today
+    c.execute("SELECT * FROM attendance WHERE roll_no=? AND date=?", (roll_no, date))
+    existing = c.fetchone()
+    if existing:
+        conn.close()
+        return jsonify({"status":"error", "message":"Attendance already marked today!"})
+
+    # Insert new attendance if not already present
     c.execute("INSERT INTO attendance (roll_no, name, date, time) VALUES (?,?,?,?)",
               (roll_no, name, date, time))
     conn.commit()
     conn.close()
 
     export_to_excel()
-    return jsonify({"status":"ok","message":"attendance marked", "roll_no": roll_no, "name": name})
+    return jsonify({"status":"ok","message":"Attendance marked successfully", "roll_no": roll_no, "name": name})
+
+
 
 # Export Excel
 @app.route("/export")
