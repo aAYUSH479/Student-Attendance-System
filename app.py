@@ -47,7 +47,6 @@ def init_db():
         ("110", "Arjun Mehta")
     ]
 
-
     for roll, name in predefined_students:
         password = name[:4].upper() + "123"
         c.execute("SELECT * FROM students WHERE roll_no=?", (roll,))
@@ -70,15 +69,18 @@ def init_db():
 
 # ----------- Helper: export to excel -------------
 def export_to_excel():
-    conn = sqlite3.connect(DB)
-    df = pd.read_sql_query("SELECT * FROM attendance", conn)
-    conn.close()
-    if not df.empty:
-        df.to_excel(EXCEL_FILE, index=False)
-    else:
-        # create empty file with headers
-        df = pd.DataFrame(columns=["id","roll_no","name","date","time"])
-        df.to_excel(EXCEL_FILE, index=False)
+    """Writes attendance data to Excel (safe for local use)."""
+    try:
+        conn = sqlite3.connect(DB)
+        df = pd.read_sql_query("SELECT * FROM attendance", conn)
+        conn.close()
+        if not df.empty:
+            df.to_excel(EXCEL_FILE, index=False)
+        else:
+            df = pd.DataFrame(columns=["id","roll_no","name","date","time"])
+            df.to_excel(EXCEL_FILE, index=False)
+    except Exception as e:
+        print("⚠ Excel export failed:", e)
 
 # ----------- Routes -------------
 
@@ -131,48 +133,23 @@ def admin_login():
 def student_dashboard():
     if "student" not in session:
         return redirect(url_for("login"))
-    
-    student = session["student"]
-    data = {"roll_no": student["roll_no"], "name": student["name"]}
+    try:
+        student = session["student"]
+        data = {"roll_no": student["roll_no"], "name": student["name"]}
 
-    # Ensure static/qr folder exists
-    qr_folder = os.path.join(app.root_path, 'static', 'qr')
-    os.makedirs(qr_folder, exist_ok=True)
+        qr_folder = os.path.join(app.root_path, 'static', 'qr')
+        os.makedirs(qr_folder, exist_ok=True)
 
-    # File path for student QR
-    qr_filename = f"{student['roll_no']}.png"
-    qr_path = os.path.join(qr_folder, qr_filename)
+        qr_filename = f"{student['roll_no']}.png"
+        qr_path = os.path.join(qr_folder, qr_filename)
 
-    # Generate and save QR image
-    img = qrcode.make(json.dumps(data))
-    img.save(qr_path)
+        img = qrcode.make(json.dumps(data))
+        img.save(qr_path)
 
-    return render_template("student.html", student=student, qr_file=url_for('static', filename='qr/' + qr_filename))
-
-
-# Generate Student QR
-@app.route("/student_qr")
-def student_qr():
-    if "student" not in session:
-        return redirect(url_for("login"))
-    
-    student = session["student"]
-    data = {"roll_no": student["roll_no"], "name": student["name"]}
-
-    # Ensure static/qr folder exists
-    qr_folder = os.path.join(app.root_path, 'static', 'qr')
-    os.makedirs(qr_folder, exist_ok=True)
-
-    # File path for student QR
-    qr_filename = f"{student['roll_no']}.png"
-    qr_path = os.path.join(qr_folder, qr_filename)
-
-    # Generate and save QR image
-    img = qrcode.make(json.dumps(data))
-    img.save(qr_path)
-
-    # Return HTML template (not send_file)
-    return render_template("student.html", student=student, qr_file=url_for('static', filename='qr/' + qr_filename))
+        return render_template("student.html", student=student,
+                               qr_file=url_for('static', filename='qr/' + qr_filename))
+    except Exception as e:
+        return f"QR Generation Error: {str(e)}"
 
 # Admin Dashboard
 @app.route("/admin_dashboard")
@@ -191,7 +168,6 @@ def admin_dashboard():
 def mark_attendance():
     if "admin" not in session:
         return jsonify({"status":"error","message":"not authorized"}), 401
-
     try:
         if request.is_json:
             payload = request.get_json()
@@ -202,7 +178,7 @@ def mark_attendance():
         roll_no = student.get("roll_no")
         name = student.get("name")
     except Exception as e:
-        return jsonify({"status":"error","message":"invalid qr data"}), 400
+        return jsonify({"status":"error","message":f"Invalid QR data: {str(e)}"}), 400
 
     conn = sqlite3.connect(DB)
     c = conn.cursor()
@@ -210,23 +186,24 @@ def mark_attendance():
     date = now.strftime("%Y-%m-%d")
     time = now.strftime("%H:%M:%S")
 
-    # ✅ Check if attendance already exists for this student today
     c.execute("SELECT * FROM attendance WHERE roll_no=? AND date=?", (roll_no, date))
     existing = c.fetchone()
     if existing:
         conn.close()
         return jsonify({"status":"error", "message":"Attendance already marked today!"})
 
-    # Insert new attendance if not already present
     c.execute("INSERT INTO attendance (roll_no, name, date, time) VALUES (?,?,?,?)",
               (roll_no, name, date, time))
     conn.commit()
     conn.close()
 
-    export_to_excel()
-    return jsonify({"status":"ok","message":"Attendance marked successfully", "roll_no": roll_no, "name": name})
+    try:
+        export_to_excel()
+    except Exception as e:
+        print("⚠ Attendance saved but Excel export failed:", e)
 
-
+    return jsonify({"status":"ok","message":"Attendance marked successfully",
+                    "roll_no": roll_no, "name": name})
 
 # Export Excel
 @app.route("/export")
@@ -238,20 +215,18 @@ def export_excel():
         return send_file(EXCEL_FILE, as_attachment=True)
     return "No attendance data"
 
-# Clear Attendance for Next Day
+# Clear Attendance
 @app.route("/clear_attendance")
 def clear_attendance():
     if "admin" not in session:
         return redirect(url_for("admin_login"))
 
-    # Clear database
     conn = sqlite3.connect(DB)
     c = conn.cursor()
     c.execute("DELETE FROM attendance")
     conn.commit()
     conn.close()
 
-    # Remove Excel file and recreate empty
     if os.path.exists(EXCEL_FILE):
         os.remove(EXCEL_FILE)
     export_to_excel()
