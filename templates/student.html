@@ -23,6 +23,51 @@
             text-decoration: none;
             border-radius: 6px;
         }
+        .logout-btn {
+            background: #007BFF;
+        }
+    </style>
+</head>
+<body>
+    <h2>Welcome, {{ student.name }}</h2>
+    <p>Roll No: {{ student.roll_no }}</p>
+
+    {% if qr_file %}
+        <h3>Your QR Code:</h3>
+        <img src="{{ url_for('static', filename='qr/' + qr_file) }}" alt="QR Code" width="200">
+    {% else %}
+        <p>No QR generated yet.</p>
+    {% endif %}
+
+    <br>
+    <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+</body>
+</html>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Student Dashboard</title>
+    <style>
+        body {
+            font-family: Poppins, sans-serif;
+            text-align: center;
+            background: #f6fff5;
+            margin-top: 100px;
+        }
+        img {
+            margin-top: 20px;
+            border: 5px solid #007BFF;
+            border-radius: 10px;
+        }
+        a {
+            display: inline-block;
+            margin-top: 20px;
+            background: #dc3545;
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 6px;
+        }
     </style>
 </head>
 <body>
