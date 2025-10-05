@@ -3,3 +3,4 @@ gunicorn
 qrcode
 pandas
 openpyxl
+Pillow
