@@ -1,9 +1,5 @@
-pip>=24.0
-setuptools>=70.0
-wheel
-
-Flask==3.0.3
-qrcode==7.4.2
-pillow==10.3.0
-pandas==2.2.2
-openpyxl==3.1.2
+Flask
+gunicorn
+qrcode
+pandas
+openpyxl
